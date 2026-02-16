@@ -62,9 +62,18 @@ RECIRCULATION_MINUTE_OPTIONS = {
 }
 
 # Temperature limits in Fahrenheit
-MIN_TEMP_F = 110
+MIN_TEMP_F = 98
 MAX_TEMP_F = 140
-TEMP_STEP = 5
+TEMP_STEP = 1  # Allows UI to select any value, validation restricts to valid setpoints
+
+# Valid temperature setpoints in Fahrenheit
+# Note: Non-uniform increments (2°F from 98-110, then 5°F from 110-140)
+VALID_TEMPERATURES = {
+    98, 100, 102, 104, 106, 108,
+    110, 115, 120, 125, 130, 135, 140
+}
+
+VALID_TEMP_LIST = sorted(VALID_TEMPERATURES)
 
 
 async def async_setup_entry(
@@ -197,12 +206,30 @@ class RinnaiWaterHeater(RinnaiEntity, WaterHeaterEntity):
             LOGGER.warning("async_set_temperature called without target temperature")
             return
 
-        # Validate temperature range
-        if not (MIN_TEMP_F <= target_temp <= MAX_TEMP_F):
-            raise ServiceValidationError(
-                f"Temperature must be between {MIN_TEMP_F}°F and {MAX_TEMP_F}°F, "
-                f"got {target_temp}°F"
-            )
+        # Validate temperature is within valid setpoints
+        # If not valid, automatically round down to nearest valid temperature
+        if target_temp not in VALID_TEMPERATURES:
+            # Find the highest valid temperature that's <= target_temp
+            valid_below = [t for t in VALID_TEMP_LIST if t <= target_temp]
+
+            if valid_below:
+                # Round down to nearest valid temperature
+                adjusted_temp = valid_below[-1]
+                LOGGER.info(
+                    "Temperature %s°F is not valid, adjusting to %s°F on %s",
+                    target_temp,
+                    adjusted_temp,
+                    self._device.device_name,
+                )
+                target_temp = adjusted_temp
+            else:
+                # User selected below minimum, use minimum
+                target_temp = VALID_TEMP_LIST[0]
+                LOGGER.info(
+                    "Temperature below minimum, using %s°F on %s",
+                    target_temp,
+                    self._device.device_name,
+                )
 
         LOGGER.info(
             "Setting target temperature to %s°F on %s",
