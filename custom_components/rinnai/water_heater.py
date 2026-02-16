@@ -237,30 +237,24 @@ class RinnaiWaterHeater(RinnaiEntity, WaterHeaterEntity):
             LOGGER.warning("async_set_temperature called without target temperature")
             return
 
-        # Validate temperature is within valid setpoints
-        # If not valid, automatically round down to nearest valid temperature
-        if target_temp not in self._valid_temperatures:
-            # Find the highest valid temperature that's <= target_temp
-            valid_below = [t for t in self._valid_temperatures if t <= target_temp]
+        # Round to nearest integer for validation (handles Celsius conversions like 40°C = 103.82°F → 104°F)
+        target_temp = round(target_temp)
 
-            if valid_below:
-                # Round down to nearest valid temperature
-                adjusted_temp = valid_below[-1]
-                LOGGER.info(
-                    "Temperature %s°F is not valid, adjusting to %s°F on %s",
-                    target_temp,
-                    adjusted_temp,
-                    self._device.device_name,
-                )
-                target_temp = adjusted_temp
-            else:
-                # User selected below minimum, use minimum
-                target_temp = self._valid_temperatures[0]
-                LOGGER.info(
-                    "Temperature below minimum, using %s°F on %s",
-                    target_temp,
-                    self._device.device_name,
-                )
+        # Validate temperature is within valid setpoints
+        # If still not valid after rounding, automatically adjust to nearest valid temperature
+        if target_temp not in self._valid_temperatures:
+            # Find the nearest valid temperature (prefer lower if equidistant for safety)
+            nearest_temp = min(
+                self._valid_temperatures, key=lambda t: (abs(t - target_temp), t)
+            )
+
+            LOGGER.info(
+                "Temperature %s°F is not a valid setpoint, adjusting to nearest valid %s°F on %s",
+                target_temp,
+                nearest_temp,
+                self._device.device_name,
+            )
+            target_temp = nearest_temp
 
         LOGGER.info(
             "Setting target temperature to %s°F on %s",
