@@ -18,11 +18,15 @@ from .const import (
     CONF_ACCESS_TOKEN,
     CONF_CONNECTION_MODE,
     CONF_HOST,
+    CONF_MAX_TEMP,
+    CONF_MIN_TEMP,
     CONF_REFRESH_TOKEN,
     CONF_STORED_PASSWORD,
     CONNECTION_MODE_CLOUD,
     CONNECTION_MODE_HYBRID,
     CONNECTION_MODE_LOCAL,
+    DEFAULT_MAX_TEMP,
+    DEFAULT_MIN_TEMP,
     DOMAIN,
 )
 from .device import RinnaiDeviceDataUpdateCoordinator
@@ -519,13 +523,24 @@ async def _async_add_entities_for_new_devices(
     from .sensor import SENSOR_DESCRIPTIONS, RinnaiSensor
     from .switch import RinnaiRecirculationSwitch
     from .water_heater import RinnaiWaterHeater
+    from .water_heater import VALID_TEMPERATURES
 
     runtime_data = entry.runtime_data
+
+    # Get configured temperature range from options
+    min_temp = entry.options.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)
+    max_temp = entry.options.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)
+
+    # Filter valid temperatures based on configured range
+    valid_temps_for_range = sorted(
+        [t for t in VALID_TEMPERATURES if min_temp <= t <= max_temp]
+    )
 
     # Add water heater entities
     if Platform.WATER_HEATER in runtime_data.entity_adders:
         water_heater_entities = [
-            RinnaiWaterHeater(device) for device in new_coordinators
+            RinnaiWaterHeater(device, valid_temps_for_range)
+            for device in new_coordinators
         ]
         runtime_data.entity_adders[Platform.WATER_HEATER](water_heater_entities)
         _LOGGER.debug(

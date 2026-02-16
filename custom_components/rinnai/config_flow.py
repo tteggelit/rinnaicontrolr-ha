@@ -29,11 +29,15 @@ from homeassistant.helpers.selector import (
 )
 
 from .const import (
+    ABSOLUTE_MAX_TEMP,
+    ABSOLUTE_MIN_TEMP,
     CONF_ACCESS_TOKEN,
     CONF_CONNECTION_MODE,
     CONF_HOST,
     CONF_MAINT_INTERVAL_ENABLED,
     CONF_MAINT_INTERVAL_MINUTES,
+    CONF_MAX_TEMP,
+    CONF_MIN_TEMP,
     CONF_RECIRCULATION_DURATION,
     CONF_REFRESH_TOKEN,
     CONF_SAVE_PASSWORD,
@@ -43,6 +47,8 @@ from .const import (
     CONNECTION_MODE_LOCAL,
     DEFAULT_MAINT_INTERVAL_ENABLED,
     DEFAULT_MAINT_INTERVAL_MINUTES,
+    DEFAULT_MAX_TEMP,
+    DEFAULT_MIN_TEMP,
     DEFAULT_RECIRCULATION_DURATION,
     DEFAULT_SAVE_PASSWORD,
     DOMAIN,
@@ -820,6 +826,37 @@ class OptionsFlow(config_entries.OptionsFlow):
                 ),
             )
         ] = vol.All(vol.Coerce(int), vol.Range(min=5, max=300))
+
+        # Add temperature range options
+        schema_dict[
+            vol.Optional(
+                CONF_MIN_TEMP,
+                default=self._config_entry.options.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP),
+            )
+        ] = NumberSelector(
+            NumberSelectorConfig(
+                min=ABSOLUTE_MIN_TEMP,
+                max=ABSOLUTE_MAX_TEMP,
+                step=1,
+                mode=NumberSelectorMode.BOX,
+                unit_of_measurement="°F",
+            )
+        )
+
+        schema_dict[
+            vol.Optional(
+                CONF_MAX_TEMP,
+                default=self._config_entry.options.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP),
+            )
+        ] = NumberSelector(
+            NumberSelectorConfig(
+                min=ABSOLUTE_MIN_TEMP,
+                max=ABSOLUTE_MAX_TEMP,
+                step=1,
+                mode=NumberSelectorMode.BOX,
+                unit_of_measurement="°F",
+            )
+        )
 
         return self.async_show_form(
             step_id="init",

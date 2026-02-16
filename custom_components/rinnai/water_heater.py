@@ -22,7 +22,15 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from . import RinnaiConfigEntry
-from .const import LOGGER
+from .const import (
+    ABSOLUTE_MAX_TEMP,
+    ABSOLUTE_MIN_TEMP,
+    CONF_MAX_TEMP,
+    CONF_MIN_TEMP,
+    DEFAULT_MAX_TEMP,
+    DEFAULT_MIN_TEMP,
+    LOGGER,
+)
 from .device import RinnaiDeviceDataUpdateCoordinator
 from .entity import RinnaiEntity
 
@@ -62,8 +70,9 @@ RECIRCULATION_MINUTE_OPTIONS = {
 }
 
 # Temperature limits in Fahrenheit
-MIN_TEMP_F = 98
-MAX_TEMP_F = 140
+# Note: These are hardware limits - actual limits are configurable per user
+HARDWARE_MIN_TEMP_F = ABSOLUTE_MIN_TEMP
+HARDWARE_MAX_TEMP_F = ABSOLUTE_MAX_TEMP
 TEMP_STEP = 1  # Allows UI to select any value, validation restricts to valid setpoints
 
 # Valid temperature setpoints in Fahrenheit
@@ -87,9 +96,26 @@ async def async_setup_entry(
 
     config_entry.runtime_data.entity_adders[Platform.WATER_HEATER] = async_add_entities
 
+    # Get configured temperature range from options
+    min_temp = config_entry.options.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)
+    max_temp = config_entry.options.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)
+
+    # Filter valid temperatures based on configured range
+    valid_temps_for_range = sorted(
+        [t for t in VALID_TEMPERATURES if min_temp <= t <= max_temp]
+    )
+
+    LOGGER.debug(
+        "Setting up water heater with temp range %d-%d°F (%d valid setpoints)",
+        min_temp,
+        max_temp,
+        len(valid_temps_for_range),
+    )
+
     LOGGER.debug("Setting up Rinnai water heater entities")
     entities = [
-        RinnaiWaterHeater(device) for device in config_entry.runtime_data.devices
+        RinnaiWaterHeater(device, valid_temps_for_range)
+        for device in config_entry.runtime_data.devices
     ]
     async_add_entities(entities)
     LOGGER.debug("Added %d water heater entities", len(entities))
@@ -121,14 +147,19 @@ class RinnaiWaterHeater(RinnaiEntity, WaterHeaterEntity):
         | WaterHeaterEntityFeature.TARGET_TEMPERATURE
     )
     _attr_temperature_unit = UnitOfTemperature.FAHRENHEIT
-    _attr_min_temp = float(MIN_TEMP_F)
-    _attr_max_temp = float(MAX_TEMP_F)
     _attr_target_temperature_step = float(TEMP_STEP)
     _attr_translation_key = "water_heater"
 
-    def __init__(self, device: RinnaiDeviceDataUpdateCoordinator) -> None:
+    def __init__(
+        self,
+        device: RinnaiDeviceDataUpdateCoordinator,
+        valid_temperatures: list[int],
+    ) -> None:
         """Initialize the water heater."""
         super().__init__("water_heater", device)
+        self._valid_temperatures = valid_temperatures
+        self._attr_min_temp = float(valid_temperatures[0])
+        self._attr_max_temp = float(valid_temperatures[-1])
 
     @property
     def current_operation(self) -> str:
@@ -208,9 +239,9 @@ class RinnaiWaterHeater(RinnaiEntity, WaterHeaterEntity):
 
         # Validate temperature is within valid setpoints
         # If not valid, automatically round down to nearest valid temperature
-        if target_temp not in VALID_TEMPERATURES:
+        if target_temp not in self._valid_temperatures:
             # Find the highest valid temperature that's <= target_temp
-            valid_below = [t for t in VALID_TEMP_LIST if t <= target_temp]
+            valid_below = [t for t in self._valid_temperatures if t <= target_temp]
 
             if valid_below:
                 # Round down to nearest valid temperature
@@ -224,7 +255,7 @@ class RinnaiWaterHeater(RinnaiEntity, WaterHeaterEntity):
                 target_temp = adjusted_temp
             else:
                 # User selected below minimum, use minimum
-                target_temp = VALID_TEMP_LIST[0]
+                target_temp = self._valid_temperatures[0]
                 LOGGER.info(
                     "Temperature below minimum, using %s°F on %s",
                     target_temp,
