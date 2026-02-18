@@ -16,7 +16,6 @@ from homeassistant.components.water_heater import (
 )
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.unit_conversion import TemperatureConverter
@@ -77,10 +76,7 @@ TEMP_STEP = 1  # Allows UI to select any value, validation restricts to valid se
 
 # Valid temperature setpoints in Fahrenheit
 # Note: Non-uniform increments (2°F from 98-110, then 5°F from 110-140)
-VALID_TEMPERATURES = {
-    98, 100, 102, 104, 106, 108,
-    110, 115, 120, 125, 130, 135, 140
-}
+VALID_TEMPERATURES = {98, 100, 102, 104, 106, 108, 110, 115, 120, 125, 130, 135, 140}
 
 VALID_TEMP_LIST = sorted(VALID_TEMPERATURES)
 
