@@ -90,8 +90,8 @@ async def async_setup_entry(
     platform.async_register_entity_service(
         SERVICE_START_RECIRCULATION,
         {
-            vol.Required(ATTR_RECIRCULATION_MINUTES, default=5): vol.In(
-                RECIRCULATION_MINUTE_OPTIONS
+            vol.Required(ATTR_RECIRCULATION_MINUTES, default=5): vol.All(
+                vol.Coerce(int), vol.In(RECIRCULATION_MINUTE_OPTIONS)
             )
         },
         "async_start_recirculation",
