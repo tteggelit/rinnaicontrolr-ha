@@ -23,6 +23,14 @@ MAX_MAINT_INTERVAL_MINUTES: Final = 60
 CONF_RECIRCULATION_DURATION: Final = "recirculation_duration"
 DEFAULT_RECIRCULATION_DURATION: Final = 10
 
+# Temperature range configuration
+CONF_MIN_TEMP: Final = "min_temp"
+CONF_MAX_TEMP: Final = "max_temp"
+DEFAULT_MIN_TEMP: Final = 110  # Conservative default for safety
+DEFAULT_MAX_TEMP: Final = 140
+ABSOLUTE_MIN_TEMP: Final = 98  # Hardware absolute minimum
+ABSOLUTE_MAX_TEMP: Final = 140  # Hardware absolute maximum
+
 # Token storage keys
 CONF_REFRESH_TOKEN: Final = "conf_refresh_token"
 CONF_ACCESS_TOKEN: Final = "conf_access_token"

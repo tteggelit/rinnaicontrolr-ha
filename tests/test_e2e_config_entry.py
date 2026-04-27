@@ -1,9 +1,14 @@
+from __future__ import annotations
+
 import sys
 import types
 import pathlib
 import importlib.util
 import shutil
+from unittest.mock import AsyncMock
+
 import pytest
+import voluptuous as vol
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from homeassistant.helpers import entity_registry as er
@@ -274,3 +279,135 @@ async def test_end_to_end_config_entry_sets_up_platforms(
     assert any(e.domain == "water_heater" for e in created)
     assert any(e.domain == "sensor" for e in created)
     assert any(e.domain == "binary_sensor" for e in created)
+
+
+async def _setup_entry(hass, monkeypatch):
+    """Shared helper: set up the integration end-to-end and return (entry, mod)."""
+    _install_fake_aiorinnai(monkeypatch)
+    mod = _preload_integration()
+    _materialize_custom_component(hass)
+
+    async def _fake_refresh(self):
+        self._device_information = await self.api_client.device.get_info(self.id)
+        return None
+
+    monkeypatch.setattr(
+        mod.RinnaiDeviceDataUpdateCoordinator, "async_refresh", _fake_refresh
+    )
+
+    entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            "email": "test@example.com",
+            "conf_access_token": "access",
+            "conf_refresh_token": "refresh",
+        },
+        options={"maint_interval_enabled": False},
+        version=2,
+    )
+    entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    return entry, mod
+
+
+def _get_water_heater_entity_id(hass, entry) -> str:
+    registry = er.async_get(hass)
+    for e in registry.entities.values():
+        if e.config_entry_id == entry.entry_id and e.domain == "water_heater":
+            return e.entity_id
+    raise AssertionError("water_heater entity not found")
+
+
+@pytest.mark.asyncio
+async def test_start_recirculation_service_coerces_string_minutes(
+    hass, enable_custom_integrations, monkeypatch
+):
+    """Regression test for #162: service must accept string "5" from UI selector.
+
+    The services.yaml `select` selector emits string values, but the schema
+    previously used `vol.In({int, ...})` which rejected strings. The fix wraps
+    the validator with `vol.Coerce(int)` so string inputs are converted before
+    membership check.
+    """
+    entry, mod = await _setup_entry(hass, monkeypatch)
+    entity_id = _get_water_heater_entity_id(hass, entry)
+
+    mock_start = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        mod.RinnaiDeviceDataUpdateCoordinator,
+        "async_start_recirculation",
+        mock_start,
+    )
+
+    await hass.services.async_call(
+        DOMAIN,
+        "start_recirculation",
+        {"recirculation_minutes": "5"},
+        target={"entity_id": entity_id},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    assert mock_start.await_count == 1
+    # Coordinator method receives the int after coercion.
+    args, kwargs = mock_start.call_args
+    # First positional arg is the duration (after `self`, which AsyncMock omits
+    # when patching as a class attribute via monkeypatch).
+    duration = args[0] if args else kwargs.get("duration")
+    assert duration == 5
+    assert isinstance(duration, int)
+
+
+@pytest.mark.asyncio
+async def test_start_recirculation_service_rejects_invalid_minutes(
+    hass, enable_custom_integrations, monkeypatch
+):
+    """Values outside RECIRCULATION_MINUTE_OPTIONS must be rejected."""
+    entry, mod = await _setup_entry(hass, monkeypatch)
+    entity_id = _get_water_heater_entity_id(hass, entry)
+
+    mock_start = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        mod.RinnaiDeviceDataUpdateCoordinator,
+        "async_start_recirculation",
+        mock_start,
+    )
+
+    with pytest.raises(vol.Invalid):
+        await hass.services.async_call(
+            DOMAIN,
+            "start_recirculation",
+            {"recirculation_minutes": "7"},
+            target={"entity_id": entity_id},
+            blocking=True,
+        )
+
+    assert mock_start.await_count == 0
+
+
+@pytest.mark.asyncio
+async def test_stop_recirculation_service_no_params(
+    hass, enable_custom_integrations, monkeypatch
+):
+    """`stop_recirculation` takes no params and must call the coordinator."""
+    entry, mod = await _setup_entry(hass, monkeypatch)
+    entity_id = _get_water_heater_entity_id(hass, entry)
+
+    mock_stop = AsyncMock(return_value=None)
+    monkeypatch.setattr(
+        mod.RinnaiDeviceDataUpdateCoordinator,
+        "async_stop_recirculation",
+        mock_stop,
+    )
+
+    await hass.services.async_call(
+        DOMAIN,
+        "stop_recirculation",
+        {},
+        target={"entity_id": entity_id},
+        blocking=True,
+    )
+    await hass.async_block_till_done()
+
+    assert mock_stop.await_count == 1

@@ -16,13 +16,20 @@ from homeassistant.components.water_heater import (
 )
 from homeassistant.const import UnitOfTemperature
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.util.unit_conversion import TemperatureConverter
 
 from . import RinnaiConfigEntry
-from .const import LOGGER
+from .const import (
+    ABSOLUTE_MAX_TEMP,
+    ABSOLUTE_MIN_TEMP,
+    CONF_MAX_TEMP,
+    CONF_MIN_TEMP,
+    DEFAULT_MAX_TEMP,
+    DEFAULT_MIN_TEMP,
+    LOGGER,
+)
 from .device import RinnaiDeviceDataUpdateCoordinator
 from .entity import RinnaiEntity
 
@@ -62,9 +69,16 @@ RECIRCULATION_MINUTE_OPTIONS = {
 }
 
 # Temperature limits in Fahrenheit
-MIN_TEMP_F = 110
-MAX_TEMP_F = 140
-TEMP_STEP = 5
+# Note: These are hardware limits - actual limits are configurable per user
+HARDWARE_MIN_TEMP_F = ABSOLUTE_MIN_TEMP
+HARDWARE_MAX_TEMP_F = ABSOLUTE_MAX_TEMP
+TEMP_STEP = 1  # Allows UI to select any value, validation restricts to valid setpoints
+
+# Valid temperature setpoints in Fahrenheit
+# Note: Non-uniform increments (2°F from 98-110, then 5°F from 110-140)
+VALID_TEMPERATURES = {98, 100, 102, 104, 106, 108, 110, 115, 120, 125, 130, 135, 140}
+
+VALID_TEMP_LIST = sorted(VALID_TEMPERATURES)
 
 
 async def async_setup_entry(
@@ -78,9 +92,26 @@ async def async_setup_entry(
 
     config_entry.runtime_data.entity_adders[Platform.WATER_HEATER] = async_add_entities
 
+    # Get configured temperature range from options
+    min_temp = config_entry.options.get(CONF_MIN_TEMP, DEFAULT_MIN_TEMP)
+    max_temp = config_entry.options.get(CONF_MAX_TEMP, DEFAULT_MAX_TEMP)
+
+    # Filter valid temperatures based on configured range
+    valid_temps_for_range = sorted(
+        [t for t in VALID_TEMPERATURES if min_temp <= t <= max_temp]
+    )
+
+    LOGGER.debug(
+        "Setting up water heater with temp range %d-%d°F (%d valid setpoints)",
+        min_temp,
+        max_temp,
+        len(valid_temps_for_range),
+    )
+
     LOGGER.debug("Setting up Rinnai water heater entities")
     entities = [
-        RinnaiWaterHeater(device) for device in config_entry.runtime_data.devices
+        RinnaiWaterHeater(device, valid_temps_for_range)
+        for device in config_entry.runtime_data.devices
     ]
     async_add_entities(entities)
     LOGGER.debug("Added %d water heater entities", len(entities))
@@ -90,8 +121,8 @@ async def async_setup_entry(
     platform.async_register_entity_service(
         SERVICE_START_RECIRCULATION,
         {
-            vol.Required(ATTR_RECIRCULATION_MINUTES, default=5): vol.In(
-                RECIRCULATION_MINUTE_OPTIONS
+            vol.Required(ATTR_RECIRCULATION_MINUTES, default=5): vol.All(
+                vol.Coerce(int), vol.In(RECIRCULATION_MINUTE_OPTIONS)
             )
         },
         "async_start_recirculation",
@@ -112,14 +143,19 @@ class RinnaiWaterHeater(RinnaiEntity, WaterHeaterEntity):
         | WaterHeaterEntityFeature.TARGET_TEMPERATURE
     )
     _attr_temperature_unit = UnitOfTemperature.FAHRENHEIT
-    _attr_min_temp = float(MIN_TEMP_F)
-    _attr_max_temp = float(MAX_TEMP_F)
     _attr_target_temperature_step = float(TEMP_STEP)
     _attr_translation_key = "water_heater"
 
-    def __init__(self, device: RinnaiDeviceDataUpdateCoordinator) -> None:
+    def __init__(
+        self,
+        device: RinnaiDeviceDataUpdateCoordinator,
+        valid_temperatures: list[int],
+    ) -> None:
         """Initialize the water heater."""
         super().__init__("water_heater", device)
+        self._valid_temperatures = valid_temperatures
+        self._attr_min_temp = float(valid_temperatures[0])
+        self._attr_max_temp = float(valid_temperatures[-1])
 
     @property
     def current_operation(self) -> str:
@@ -197,12 +233,24 @@ class RinnaiWaterHeater(RinnaiEntity, WaterHeaterEntity):
             LOGGER.warning("async_set_temperature called without target temperature")
             return
 
-        # Validate temperature range
-        if not (MIN_TEMP_F <= target_temp <= MAX_TEMP_F):
-            raise ServiceValidationError(
-                f"Temperature must be between {MIN_TEMP_F}°F and {MAX_TEMP_F}°F, "
-                f"got {target_temp}°F"
+        # Round to nearest integer for validation (handles Celsius conversions like 40°C = 103.82°F → 104°F)
+        target_temp = round(target_temp)
+
+        # Validate temperature is within valid setpoints
+        # If still not valid after rounding, automatically adjust to nearest valid temperature
+        if target_temp not in self._valid_temperatures:
+            # Find the nearest valid temperature (prefer lower if equidistant for safety)
+            nearest_temp = min(
+                self._valid_temperatures, key=lambda t: (abs(t - target_temp), t)
             )
+
+            LOGGER.info(
+                "Temperature %s°F is not a valid setpoint, adjusting to nearest valid %s°F on %s",
+                target_temp,
+                nearest_temp,
+                self._device.device_name,
+            )
+            target_temp = nearest_temp
 
         LOGGER.info(
             "Setting target temperature to %s°F on %s",
