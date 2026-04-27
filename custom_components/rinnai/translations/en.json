@@ -138,12 +138,16 @@
                 "data": {
                     "maint_interval_enabled": "Enable maintenance data retrieval",
                     "maint_interval_minutes": "Maintenance retrieval interval",
-                    "recirculation_duration": "Recirculation Duration"
+                    "recirculation_duration": "Recirculation Duration",
+                    "min_temp": "Minimum Temperature",
+                    "max_temp": "Maximum Temperature"
                 },
                 "data_description": {
                     "maint_interval_enabled": "When enabled, retrieves detailed maintenance data from the device at the specified interval. This may increase API usage.",
                     "maint_interval_minutes": "How often to retrieve maintenance data from the device (in minutes). Lower values provide more frequent updates but increase API usage. Only available for Local and Hybrid connection modes.",
-                    "recirculation_duration": "Duration in minutes (5-300) used by the Recirculation switch entity when turned on."
+                    "recirculation_duration": "Duration in minutes (5-300) used by the Recirculation switch entity when turned on.",
+                    "min_temp": "Minimum allowed temperature for your water heater (98-140°F). Hardware supports down to 98°F, but 110°F is recommended for safety. Only valid setpoints within your range will be available: 98, 100, 102, 104, 106, 108, 110, 115, 120, 125, 130, 135, 140°F.",
+                    "max_temp": "Maximum allowed temperature for your water heater (98-140°F). Default is 140°F. Only valid setpoints within your range will be available."
                 }
             }
         }
