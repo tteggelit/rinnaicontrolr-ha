@@ -353,10 +353,11 @@ class RinnaiDeviceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             try:
                 await self._ensure_valid_token()
 
+                device_client = self.api_client.device
+                assert device_client is not None  # set by async_login/renew
+
                 async with asyncio.timeout(10):
-                    device_info = await self.api_client.device.get_info(
-                        self._rinnai_device_id
-                    )
+                    device_info = await device_client.get_info(self._rinnai_device_id)
 
                 self._consecutive_errors = 0
                 self._last_error = None
@@ -472,10 +473,12 @@ class RinnaiDeviceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         try:
             await self._ensure_valid_token()
+
+            device_client = self.api_client.device
+            assert device_client is not None  # set by async_login/renew
+
             async with asyncio.timeout(10):
-                device_info = await self.api_client.device.get_info(
-                    self._rinnai_device_id
-                )
+                device_info = await device_client.get_info(self._rinnai_device_id)
             device_data = device_info.get("data", {}).get("getDevice", {})
             cloud_name = device_data.get("device_name")
             if cloud_name:

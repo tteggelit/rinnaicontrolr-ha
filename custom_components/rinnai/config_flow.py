@@ -224,7 +224,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
                 errors=errors,
             )
 
+        assert self.api.user is not None  # set by async_login
         user_info = await self.api.user.get_info()
+        if user_info is None:
+            LOGGER.error("Failed to retrieve user info for %s", self.username)
+            errors["base"] = "cannot_connect"
+            return self.async_show_form(
+                step_id="cloud",
+                data_schema=_get_cloud_auth_schema(default_email=self.username),
+                errors=errors,
+            )
         title = user_info["email"]
         LOGGER.debug("Config flow: retrieved user info for %s", title)
 
@@ -431,8 +440,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):  # type: ignore[call
         # These are set in async_step_hybrid_cloud before reaching this step
         assert self.api is not None
         assert self.username is not None
+        assert self.api.user is not None  # set by async_login
 
         user_info = await self.api.user.get_info()
+        if user_info is None:
+            LOGGER.error("Failed to retrieve user info for %s", self.username)
+            errors["base"] = "cannot_connect"
+            return self.async_show_form(
+                step_id="hybrid_local",
+                data_schema=_get_local_schema(default_host=self.host),
+                errors=errors,
+            )
         title = user_info["email"]
 
         # Set unique ID based on email to prevent duplicate entries

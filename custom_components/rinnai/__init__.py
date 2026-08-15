@@ -225,6 +225,7 @@ async def _setup_cloud_client(
             entry.data[CONF_ACCESS_TOKEN],
             entry.data[CONF_REFRESH_TOKEN],
         )
+        assert client.user is not None  # set by async_renew_access_token
         user_info = await client.user.get_info()
         _LOGGER.debug("User info retrieved: %s", user_info)
 
@@ -240,6 +241,7 @@ async def _setup_cloud_client(
             _LOGGER.info("Attempting automatic re-login with stored password")
             try:
                 await client.async_login(entry.data[CONF_EMAIL], stored_password)
+                assert client.user is not None  # set by async_login
                 user_info = await client.user.get_info()
                 _LOGGER.info("Automatic re-login successful")
 
@@ -274,6 +276,9 @@ async def _setup_cloud_client(
     except RequestError as err:
         _LOGGER.error("Request error during setup: %s", err)
         raise ConfigEntryNotReady(f"Unable to connect to Rinnai API: {err}") from err
+
+    if user_info is None:
+        raise ConfigEntryNotReady("Could not retrieve user info from Rinnai API")
 
     devices = user_info.get("devices", {}).get("items", [])
     if not devices:
@@ -609,7 +614,11 @@ async def async_check_device_changes(
         return
 
     try:
+        assert runtime_data.client.user is not None  # set by async_login/renew
         user_info = await runtime_data.client.user.get_info()
+        if user_info is None:
+            _LOGGER.debug("No user info returned while checking for device changes")
+            return
         devices = user_info.get("devices", {}).get("items", [])
         current_device_ids = {device["id"] for device in devices}
 
