@@ -46,7 +46,7 @@ def _error_description_state_key(code: str | None) -> str | None:
     return code.lower().replace(" ", "_")
 
 
-ERROR_DESCRIPTION_STATES: tuple[str, ...] = (
+ERROR_DESCRIPTION_STATES: list[str] = [
     NO_ERROR_STATE,
     "2",
     "3",
@@ -65,9 +65,9 @@ ERROR_DESCRIPTION_STATES: tuple[str, ...] = (
     "72",
     "lc",
     "no_code",
-)
+]
 
-ERROR_CODE_STATES: tuple[str, ...] = (
+ERROR_CODE_STATES: list[str] = [
     NO_ERROR_STATE,
     "2",
     "3",
@@ -86,7 +86,7 @@ ERROR_CODE_STATES: tuple[str, ...] = (
     "72",
     "lc",
     "no_code",
-)
+]
 
 
 @dataclass(frozen=True, kw_only=True)
