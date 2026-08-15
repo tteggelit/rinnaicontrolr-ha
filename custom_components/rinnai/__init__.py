@@ -619,7 +619,7 @@ async def async_check_device_changes(
         # Then check for new devices
         await async_discover_and_add_new_devices(hass, entry, current_device_ids)
 
-    except Exception as err:
+    except Exception as err:  # noqa: BLE001 - periodic poll, retried next interval
         _LOGGER.warning("Failed to check for device changes: %s", err)
 
 

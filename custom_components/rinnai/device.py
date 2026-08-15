@@ -99,7 +99,7 @@ def _is_token_expired(
     except jwt.DecodeError:
         LOGGER.warning("Failed to decode token, treating as expired")
         return True
-    except Exception as err:
+    except jwt.PyJWTError as err:
         LOGGER.warning("Error checking token expiration: %s", err)
         return True
 
@@ -292,7 +292,7 @@ class RinnaiDeviceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 # data is None - treat as a retriable error
                 last_error = Exception("No response from local controller")
 
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - retry loop, any failure retried
                 last_error = error
 
             # Check if we've exceeded the retry window
@@ -437,7 +437,7 @@ class RinnaiDeviceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         await self._maybe_do_maintenance_retrieval()
 
                     return data
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - any local failure falls back to cloud
                 local_error = error
                 LOGGER.warning("Hybrid mode: local failed (%s), trying cloud...", error)
 
@@ -483,7 +483,7 @@ class RinnaiDeviceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 LOGGER.debug(
                     "Cached cloud device name '%s' for hybrid mode", cloud_name
                 )
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001
             # Non-fatal - we'll just use the serial number fallback
             LOGGER.debug("Could not fetch cloud device name: %s", error)
 
@@ -904,7 +904,7 @@ class RinnaiDeviceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 try:
                     await self._execute_local_action(action_name, local_method, *args)
                     return
-                except Exception as error:
+                except Exception as error:  # noqa: BLE001 - any local failure falls back to cloud
                     LOGGER.warning(
                         "Hybrid mode: local %s failed (%s), trying cloud...",
                         action_name,
@@ -1066,7 +1066,7 @@ class RinnaiDeviceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             )
             self._last_maintenance_retrieval = now
             LOGGER.debug("Rinnai maintenance retrieval started")
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - best-effort diagnostic, non-critical
             LOGGER.warning("Maintenance retrieval failed: %s", error)
 
     async def async_do_maintenance_retrieval(self) -> None:
