@@ -21,6 +21,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
 from . import RinnaiConfigEntry
 from .entity import RinnaiEntity
 

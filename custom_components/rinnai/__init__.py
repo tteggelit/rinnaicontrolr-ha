@@ -11,7 +11,8 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL, Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
-from homeassistant.helpers import device_registry as dr, issue_registry as ir
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
@@ -178,10 +179,11 @@ def _setup_device_discovery_listener(
 
     Checks for device additions/removals every 10 minutes.
     """
-    from homeassistant.helpers.event import async_track_time_interval
     from datetime import timedelta
 
-    async def _check_devices(now: Any = None) -> None:  # noqa: ANN401
+    from homeassistant.helpers.event import async_track_time_interval
+
+    async def _check_devices(now: Any = None) -> None:
         """Check for device changes."""
         await async_check_device_changes(hass, entry)
 
@@ -522,8 +524,7 @@ async def _async_add_entities_for_new_devices(
     from .binary_sensor import BINARY_SENSOR_DESCRIPTIONS, RinnaiBinarySensor
     from .sensor import SENSOR_DESCRIPTIONS, RinnaiSensor
     from .switch import RinnaiRecirculationSwitch
-    from .water_heater import RinnaiWaterHeater
-    from .water_heater import VALID_TEMPERATURES
+    from .water_heater import VALID_TEMPERATURES, RinnaiWaterHeater
 
     runtime_data = entry.runtime_data
 

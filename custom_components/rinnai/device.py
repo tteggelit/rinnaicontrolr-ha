@@ -8,7 +8,6 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 import jwt
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_EMAIL
 from homeassistant.core import HomeAssistant
@@ -24,8 +23,10 @@ from .const import (
     CONNECTION_MODE_HYBRID,
     CONNECTION_MODE_LOCAL,
     DEFAULT_MAINT_INTERVAL_MINUTES,
-    DOMAIN as RINNAI_DOMAIN,
     LOGGER,
+)
+from .const import (
+    DOMAIN as RINNAI_DOMAIN,
 )
 
 if TYPE_CHECKING:
@@ -539,9 +540,7 @@ class RinnaiDeviceDataUpdateCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self, cloud_keys: tuple[str, ...], local_key: str, default: Any = None
     ) -> Any:
         """Get value from appropriate data source based on connection mode."""
-        if self._connection_mode == CONNECTION_MODE_LOCAL:
-            return self._get_local_value(local_key, default)
-        elif (
+        if self._connection_mode == CONNECTION_MODE_LOCAL or (
             self._connection_mode == CONNECTION_MODE_HYBRID and not self._using_fallback
         ):
             return self._get_local_value(local_key, default)

@@ -6,15 +6,13 @@ import re
 from typing import Any
 
 import voluptuous as vol
-
 from aiorinnai import API
 from aiorinnai.errors import (
-    RequestError,
-    UserNotFound,
-    UserNotConfirmed,
     PasswordChangeRequired,
+    RequestError,
+    UserNotConfirmed,
+    UserNotFound,
 )
-
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult
 from homeassistant.const import CONF_EMAIL, CONF_PASSWORD
