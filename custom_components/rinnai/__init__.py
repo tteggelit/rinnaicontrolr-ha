@@ -364,11 +364,14 @@ async def async_unload_entry(hass: HomeAssistant, entry: RinnaiConfigEntry) -> b
     _LOGGER.info("Unloading Rinnai integration (entry_id=%s)", entry.entry_id[:8])
 
     # Cancel device discovery listener if it exists
-    if hasattr(entry, "runtime_data") and entry.runtime_data is not None:
-        if entry.runtime_data.cancel_device_discovery is not None:
-            entry.runtime_data.cancel_device_discovery()
-            entry.runtime_data.cancel_device_discovery = None
-            _LOGGER.debug("Cancelled device discovery listener")
+    if (
+        hasattr(entry, "runtime_data")
+        and entry.runtime_data is not None
+        and entry.runtime_data.cancel_device_discovery is not None
+    ):
+        entry.runtime_data.cancel_device_discovery()
+        entry.runtime_data.cancel_device_discovery = None
+        _LOGGER.debug("Cancelled device discovery listener")
 
     result = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if result:
