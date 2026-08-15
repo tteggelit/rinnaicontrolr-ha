@@ -69,11 +69,8 @@ def _is_hostname(host: str) -> bool:
     # Check for IPv4 pattern
     if _IPV4_PATTERN.match(host):
         return False
-    # Check for IPv6 (contains colons)
-    if ":" in host:
-        return False
-    # Anything else is likely a hostname
-    return True
+    # Check for IPv6 (contains colons); anything else is likely a hostname
+    return ":" not in host
 
 
 # Common schema components to reduce duplication
